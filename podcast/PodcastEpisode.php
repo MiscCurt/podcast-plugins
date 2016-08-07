@@ -19,7 +19,7 @@ class PodcastEpisode
             $episode = new PodcastEpisode();
             $episode->title = $meta['title'];
 
-            $episode->address = $meta['address'];
+            $episode->address = $page['url'];
 
             if (array_key_exists('date', $meta)) {
                 $episode->date = strtotime($meta['date']);
