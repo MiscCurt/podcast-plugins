@@ -4,6 +4,14 @@ class PodcastPlugin extends AbstractPicoPlugin
 {
     protected $episodes = null;
 
+    /**
+     * Compares two episodes and determines their sort order based on date
+     *
+     * @param PodcastEpisode $episode1 The first episode
+     * @param PodcastEpisode $episode2 The second episode
+     *
+     * @return int -1, 0, or 1, for compatibility with PHP's usort function
+     */
     protected function compareEpisodes($episode1, $episode2)
     {
         if ($episode1->date < $episode2->date) {
@@ -64,8 +72,22 @@ class PodcastPlugin extends AbstractPicoPlugin
         $twigVariables['episodes'] = $this->episodes;
     }
 
+    /**
+     * Sorts the given array of episodes by date
+     *
+     * @param PodcastEpisode[] $episodes The array of episodes
+     *
+     * @return void The episode array is passed by reference and sorted directly
+     */
     protected function sortEpisodes(&$episodes)
     {
+        // Use this class's comparison function to sort the array
         usort($episodes, array('PodcastPlugin', 'compareEpisodes'));
+
+        // Reverse the result in order to put the episodes in reverse
+        // chronological order. We could just make compareEpisodes reverse the
+        // order directly, but coding this way makes both functions easier to
+        // understand
+        $episodes = array_reverse($episodes);
     }
 }
