@@ -3,9 +3,11 @@
 class PodcastEpisode
 {
     public $title;
+    public $address;
     public $date;
     public $bannerImage;
     public $thumbnailImage;
+    public $excerpt;
 
     public static function createFromPage($page)
     {
@@ -17,25 +19,25 @@ class PodcastEpisode
             $episode = new PodcastEpisode();
             $episode->title = $meta['title'];
 
+            $episode->address = $page['url'];
+
             if (array_key_exists('date', $meta)) {
                 $episode->date = strtotime($meta['date']);
             }
 
-            if (array_key_exists('image', $meta)) {
-                foreach ($meta['image'] as $image) {
-                    if (array_key_exists('Banner', $image)) {
-                        $episode->bannerImage = $image['Banner'];
-                    }
+            if (array_key_exists('banner', $meta)) {
+                $episode->bannerImage = $meta['banner'];
+            }
 
-                    if (array_key_exists('Thumbnail', $image)) {
-                        $episode->thumbnailImage = $image['Thumbnail'];
-                    }
-                }
+            if (array_key_exists('thumbnail', $meta)) {
+                $episode->thumbnailImage = $meta['thumbnail'];
             }
 
             if (array_key_exists('sound', $meta)) {
                 $episode->sound = $meta['sound'];
             }
+
+            $episode->excerpt = explode('(excerpt)', $page['content'])[0];
         }
 
         return $episode;
