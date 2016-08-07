@@ -2,12 +2,13 @@
 
 class PodcastEpisode
 {
-    public $title;
-    public $address;
-    public $date;
-    public $bannerImage;
-    public $thumbnailImage;
-    public $excerpt;
+    public $title = '';
+    public $address = '';
+    public $date = null;
+    public $bannerImage = '';
+    public $thumbnailImage = '';
+    public $sound = '';
+    public $excerpt = '';
 
     public static function createFromPage($page)
     {
@@ -37,7 +38,13 @@ class PodcastEpisode
                 $episode->sound = $meta['sound'];
             }
 
-            $episode->excerpt = explode('(excerpt)', $page['content'])[0];
+            if (array_key_exists('content', $page)) {
+                if (strpos($page['content'], '(excerpt)') !== false) {
+                    $episode->excerpt = explode('(excerpt)', $page['content'])[0] . '...';
+                } else {
+                    $episode->excerpt = $page['content'];
+                }
+            }
         }
 
         return $episode;
