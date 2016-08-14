@@ -3,6 +3,7 @@
 class PodcastPlugin extends AbstractPicoPlugin
 {
     protected $episodes = null;
+    protected $rssValues = [];
 
     /**
      * Compares two episodes and determines their sort order based on date
@@ -21,6 +22,62 @@ class PodcastPlugin extends AbstractPicoPlugin
         } elseif ($episode1->date > $episode2->date) {
             return 1;
         }
+    }
+
+    public function getRssValuesFromConfig($config)
+    {
+        $values = [
+            'copyright' => array_key_exists('copyright', $config) ? $config['copyright'] : '',
+            'language' => \Locale::getPrimaryLanguage(null),
+        ];
+
+        return $values;
+    }
+
+    public function getRssValuesFromEpisodes($episodes)
+    {
+        $values = [];
+
+        $episodeCount = count($episodes);
+
+        if ($episodeCount > 0) {
+            $values['published'] = date('r', $episodes[$episodeCount - 1]->date);
+            $values['lastBuildDate'] = date('r', $episodes[0]->date);
+        }
+
+        return $values;
+    }
+
+    public function getRssValuesFromPageData($pageData)
+    {
+        $meta = $pageData['meta'];
+
+        print_r($meta);
+
+        $values = [
+            'url' => $pageData['url'],
+        ];
+
+        if (array_key_exists('editor', $meta)) {
+            $values['editor'] = $meta['editor'];
+        }
+
+        return $values;
+    }
+
+    /**
+     * Triggered after Pico has read its configuration
+     *
+     * @see    Pico::getConfig()
+     * @param  array &$config array of config variables
+     * @return void
+     */
+    public function onConfigLoaded(array &$config)
+    {
+        $this->rssValues = array_merge(
+            $this->rssValues,
+            $this->getRssValuesFromConfig($config)
+        );
     }
 
     /**
@@ -70,6 +127,49 @@ class PodcastPlugin extends AbstractPicoPlugin
     {
         $this->sortEpisodes($this->episodes);
         $twigVariables['episodes'] = $this->episodes;
+
+        $this->rssValues = array_merge(
+            $this->rssValues,
+            $this->getRssValuesFromEpisodes($this->episodes)
+        );
+
+        $twigVariables['rss'] = $this->rssValues;
+    }
+
+    /**
+     * Triggered when Pico reads a single page from the list of all known pages
+     *
+     * The `$pageData` parameter consists of the following values:
+     *
+     * | Array key      | Type   | Description                              |
+     * | -------------- | ------ | ---------------------------------------- |
+     * | id             | string | relative path to the content file        |
+     * | url            | string | URL to the page                          |
+     * | title          | string | title of the page (YAML header)          |
+     * | description    | string | description of the page (YAML header)    |
+     * | author         | string | author of the page (YAML header)         |
+     * | time           | string | timestamp derived from the Date header   |
+     * | date           | string | date of the page (YAML header)           |
+     * | date_formatted | string | formatted date of the page               |
+     * | raw_content    | string | raw, not yet parsed contents of the page |
+     * | meta           | string | parsed meta data of the page             |
+     *
+     * @see    DummyPlugin::onPagesLoaded()
+     * @param  array &$pageData data of the loaded page
+     * @return void
+     */
+    public function onSinglePageLoaded(array &$pageData)
+    {
+        $meta = $pageData['meta'];
+
+        if (array_key_exists('contains', $meta)) {
+            if ($meta['contains'] = 'rss') {
+                $this->rssValues = array_merge(
+                    $this->rssValues,
+                    $this->getRssValuesFromPageData($pageData)
+                );
+            }
+        }
     }
 
     /**
