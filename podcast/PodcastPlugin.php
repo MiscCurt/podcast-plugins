@@ -3,6 +3,7 @@
 class PodcastPlugin extends AbstractPicoPlugin
 {
     protected $episodes = null;
+    protected $guidFilePath = null;
     protected $rssValues = [];
 
     /**
@@ -24,16 +25,6 @@ class PodcastPlugin extends AbstractPicoPlugin
         }
     }
 
-    public function getRssValuesFromConfig($config)
-    {
-        $values = [
-            'copyright' => array_key_exists('copyright', $config) ? $config['copyright'] : '',
-            'language' => \Locale::getPrimaryLanguage(null),
-        ];
-
-        return $values;
-    }
-
     public function getRssValuesFromEpisodes($episodes)
     {
         $values = [];
@@ -52,32 +43,11 @@ class PodcastPlugin extends AbstractPicoPlugin
     {
         $meta = $pageData['meta'];
 
-        print_r($meta);
-
-        $values = [
-            'url' => $pageData['url'],
-        ];
-
-        if (array_key_exists('editor', $meta)) {
-            $values['editor'] = $meta['editor'];
+        if (array_key_exists('guidfile', $meta)) {
+            $this->guidFilePath = $meta['guidfile'];
         }
 
-        return $values;
-    }
-
-    /**
-     * Triggered after Pico has read its configuration
-     *
-     * @see    Pico::getConfig()
-     * @param  array &$config array of config variables
-     * @return void
-     */
-    public function onConfigLoaded(array &$config)
-    {
-        $this->rssValues = array_merge(
-            $this->rssValues,
-            $this->getRssValuesFromConfig($config)
-        );
+        return $meta;
     }
 
     /**
@@ -103,9 +73,10 @@ class PodcastPlugin extends AbstractPicoPlugin
         array &$nextPage = null
     ) {
         $this->episodes = [];
+        $guidFile = PodcastGuidFile::createFromFile($this->guidFilePath);
 
         foreach ($pages as $page) {
-            $episode = PodcastEpisode::createFromPage($page);
+            $episode = PodcastEpisode::createFromPage($page, $guidFile);
 
             if (!is_null($episode)) {
                 $this->episodes[] = $episode;
