@@ -3,15 +3,16 @@
 class PodcastEpisode
 {
     public $title = '';
-    public $address = '';
+    public $link = '';
     public $date = null;
     public $bannerImage = '';
     public $thumbnailImage = '';
     public $sound = '';
     public $excerpt = '';
     public $guid = '';
+    public $explicit = 'no';
 
-    public static function createFromPage($page, $guidFile)
+    public static function createFromPage($page, $assetsPath, $guidFile)
     {
         if (!PodcastEpisode::validatePageData($page)) {
             return null;
@@ -25,30 +26,51 @@ class PodcastEpisode
 
         $episode = new PodcastEpisode();
         $episode->title = $meta['title'];
-        $episode->address = $page['url'];
+        $episode->link = $page['url'];
 
         if (array_key_exists('date', $meta)) {
             $episode->date = strtotime($meta['date']);
         }
 
         if (array_key_exists('banner', $meta)) {
-            $episode->bannerImage = $meta['banner'];
+            // $episode->bannerImage = $assetsPath . $meta['banner'];
+            $episode->bannerImage = FileHelper::getFilePath($assetsPath, $meta['banner']);
         }
 
         if (array_key_exists('thumbnail', $meta)) {
-            $episode->thumbnailImage = $meta['thumbnail'];
-        }
-
-        if (array_key_exists('sound', $meta)) {
-            $episode->sound = $meta['sound'];
+            // $episode->thumbnailImage = $assetsPath . $meta['thumbnail'];
+            $episode->thumbnailImage = FileHelper::getFilePath($assetsPath, $meta['thumbnail']);
         }
 
         if (array_key_exists('content', $page)) {
-            if (strpos($page['content'], '(excerpt)') !== false) {
-                $episode->excerpt = explode('(excerpt)', $page['content'])[0] . '...';
+            $contentText = str_replace(
+                [PHP_EOL, '</p><p>', '<p>', '</p>'],
+                [' ', ' ', '', ''],
+                trim($page['content'])
+            );
+
+            if (strpos($contentText, '(excerpt)') !== false) {
+                $episode->excerpt = explode('(excerpt)', $contentText)[0] . '...';
             } else {
-                $episode->excerpt = $page['content'];
+                $episode->excerpt = $contentText;
             }
+
+            $contentText = str_replace('(excerpt)', ' ', $contentText);
+            $episode->description = $contentText;
+        }
+
+        if (array_key_exists('sound', $meta)) {
+            // $episode->sound = $assetsPath . $meta['sound'];
+            $episode->sound = FileHelper::getFilePath($assetsPath, $meta['sound']);
+            $episode->size = FileHelper::getFileSize($episode->sound);
+        }
+
+        if (array_key_exists('length', $meta)) {
+            $episode->length = $meta['length'];
+        }
+
+        if (array_key_exists('explicit', $meta)) {
+            $episode->explicit = $meta['explicit'];
         }
 
         $episode->guid = $guidFile->getGuidForId($page['id']);

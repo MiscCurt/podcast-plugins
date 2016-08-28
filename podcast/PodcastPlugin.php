@@ -2,6 +2,7 @@
 
 class PodcastPlugin extends AbstractPicoPlugin
 {
+    protected $assetsPath = '';
     protected $episodes = null;
     protected $guidFilePath = null;
     protected $rssValues = [];
@@ -43,8 +44,16 @@ class PodcastPlugin extends AbstractPicoPlugin
     {
         $meta = $pageData['meta'];
 
+        if (array_key_exists('assetspath', $meta)) {
+            $this->assetsPath = $meta['assetspath'];
+        }
+
+        if (array_key_exists('image', $meta)) {
+            $meta['image'] = FileHelper::getFilePath($this->assetsPath, $meta['image']);
+        }
+
         if (array_key_exists('guidfile', $meta)) {
-            $this->guidFilePath = $meta['guidfile'];
+            $this->guidFilePath = FileHelper::getFilePath($this->assetsPath, $meta['guidfile'], true, true);
         }
 
         return $meta;
@@ -76,7 +85,11 @@ class PodcastPlugin extends AbstractPicoPlugin
         $guidFile = PodcastGuidFile::createFromFile($this->guidFilePath);
 
         foreach ($pages as $page) {
-            $episode = PodcastEpisode::createFromPage($page, $guidFile);
+            $episode = PodcastEpisode::createFromPage(
+                $page,
+                $this->assetsPath,
+                $guidFile
+            );
 
             if (!is_null($episode)) {
                 $this->episodes[] = $episode;
