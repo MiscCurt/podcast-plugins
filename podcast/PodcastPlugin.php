@@ -129,7 +129,10 @@ class PodcastPlugin extends AbstractPicoPlugin
                 }
 
                 $guidFile = PodcastGuidFile::createFromFile($feed->guidfile);
-                $episode->guid = $guidFile->getGuidForId($episode->id);
+
+                if ($guidFile) {
+                    $episode->guid = $guidFile->getGuidForId($episode->id);
+                }
             }
         }
     }
