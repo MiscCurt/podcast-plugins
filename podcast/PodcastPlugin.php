@@ -128,11 +128,12 @@ class PodcastPlugin extends AbstractPicoPlugin
                     $episode->size = FileHelper::getFileSize($episode->sound);
                 }
 
-                $guidFile = PodcastGuidFile::createFromFile($feed->guidfile);
-
-                if ($guidFile) {
-                    $episode->guid = $guidFile->getGuidForId($episode->id);
-                }
+                // $guidFile = PodcastGuidFile::createFromFile($feed->guidfile);
+                //
+                // if ($guidFile) {
+                //     $episode->guid = $guidFile->getGuidForId($episode->id);
+                // }
+                $episode->guid = "test-guid";
             }
         }
     }
