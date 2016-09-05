@@ -2,100 +2,102 @@
 
 class PodcastEpisode
 {
-    public $title = '';
-    public $link = '';
-    public $date = null;
-    public $bannerImage = '';
-    public $thumbnailImage = '';
-    public $sound = '';
-    public $excerpt = '';
-    public $guid = '';
-    public $explicit = 'no';
+    /**
+     * Compares two episodes and determines their sort order based on date
+     *
+     * @param PodcastEpisode $episode1 The first episode
+     * @param PodcastEpisode $episode2 The second episode
+     *
+     * @return int -1, 0, or 1, for compatibility with PHP's usort function
+     */
+    public static function compareDate($episode1, $episode2)
+    {
+        if ($episode1->date < $episode2->date) {
+            return -1;
+        } elseif ($episode1->date == $episode2->date) {
+            return 0;
+        } elseif ($episode1->date > $episode2->date) {
+            return 1;
+        }
+    }
 
-    public static function createFromPage($page, $assetsPath, $guidFile)
+    public static function createFromPage($page)
     {
         if (!PodcastEpisode::validatePageData($page)) {
             return null;
         }
 
-        if (!$guidFile) {
-            return null;
-        }
-
+        $episode = new PodcastEpisode();
         $meta = $page['meta'];
 
-        $episode = new PodcastEpisode();
-        $episode->title = $meta['title'];
-        $episode->link = $page['url'];
-
-        if (array_key_exists('date', $meta)) {
-            $episode->date = strtotime($meta['date']);
+        foreach ($meta as $key => $value) {
+            $episode->$key = $value;
         }
 
-        if (array_key_exists('banner', $meta)) {
-            // $episode->bannerImage = $assetsPath . $meta['banner'];
-            $episode->bannerImage = FileHelper::getFilePath($assetsPath, $meta['banner']);
-        }
-
-        if (array_key_exists('thumbnail', $meta)) {
-            // $episode->thumbnailImage = $assetsPath . $meta['thumbnail'];
-            $episode->thumbnailImage = FileHelper::getFilePath($assetsPath, $meta['thumbnail']);
-        }
-
-        if (array_key_exists('content', $page)) {
-            $contentText = str_replace(
-                [PHP_EOL, '</p><p>', '<p>', '</p>'],
-                [' ', ' ', '', ''],
-                trim($page['content'])
-            );
-
-            if (strpos($contentText, '(excerpt)') !== false) {
-                $episode->excerpt = explode('(excerpt)', $contentText)[0] . '...';
-            } else {
-                $episode->excerpt = $contentText;
-            }
-
-            $contentText = str_replace('(excerpt)', ' ', $contentText);
-            $episode->description = $contentText;
-        }
-
-        if (array_key_exists('sound', $meta)) {
-            // $episode->sound = $assetsPath . $meta['sound'];
-            $episode->sound = FileHelper::getFilePath($assetsPath, $meta['sound']);
-            $episode->size = FileHelper::getFileSize($episode->sound);
-        }
-
-        if (array_key_exists('length', $meta)) {
-            $episode->length = $meta['length'];
-        }
-
-        if (array_key_exists('explicit', $meta)) {
-            $episode->explicit = $meta['explicit'];
-        }
-
-        $episode->guid = $guidFile->getGuidForId($page['id']);
+        $episode->id = $page['id'];
+        $episode->link = ArrayHelper::getValue('url', $page);
+        $episode->description = PodcastEpisode::getDescriptionFromContent(
+            ArrayHelper::getValue('content', $page)
+        );
+        $episode->excerpt = PodcastEpisode::getExcerptFromContent(
+            ArrayHelper::getValue('content', $page)
+        );
 
         return $episode;
     }
 
+    public static function getDescriptionFromContent($content)
+    {
+        $contentText = PodcastEpisode::processContent($content);
+        return str_replace('(excerpt)', ' ', $contentText);
+    }
+
+    public static function getExcerptFromContent($content)
+    {
+        $contentText = PodcastEpisode::processContent($content);
+
+        if (strpos($contentText, '(excerpt)') !== false) {
+            $contentText = explode('(excerpt)', $contentText)[0] . '...';
+        }
+
+        return $contentText;
+    }
+
     public function getFormattedDate()
     {
-        return date('r', $this->date);
+        return date('r', strtotime($this->date));
+    }
+
+    public static function processContent($content)
+    {
+        return str_replace(
+            [PHP_EOL, '</p><p>', '<p>', '</p>'],
+            [' ', ' ', '', ''],
+            trim($content)
+        );
     }
 
     public static function validatePageData($page)
     {
+        if (!is_array($page)) {
+            return false;
+        }
+
         if (!array_key_exists('meta', $page)) {
             return false;
         }
 
         $meta = $page['meta'];
 
-        if (!array_key_exists('template', $meta)) {
+        if (!is_array($meta)) {
             return false;
         }
 
-        if ($meta['template'] != 'episode') {
+        if (!array_key_exists('contains', $meta)) {
+            return false;
+        }
+
+        if ($meta['contains'] != 'episode') {
             return false;
         }
 

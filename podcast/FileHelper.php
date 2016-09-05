@@ -28,6 +28,10 @@ class FileHelper
 
     public static function getFilePath($path, $fileName, $readable = true, $writable = false)
     {
+        if (!is_string($fileName)) {
+            return false;
+        }
+
         clearstatcache();
 
         if (substr($path, -1) != DIRECTORY_SEPARATOR) {

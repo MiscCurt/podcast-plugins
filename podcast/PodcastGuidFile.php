@@ -15,7 +15,11 @@ class PodcastGuidFile implements ArrayAccess
 
     public static function createFromFile($filePath)
     {
-        PodcastGuidFile::validateGuidFile($filePath);
+        try {
+            PodcastGuidFile::validateGuidFile($filePath);
+        } catch (Exception $e) {
+            return false;
+        }
 
         $guidFile = new PodcastGuidFile();
         $guidFile->filePath = $filePath;
