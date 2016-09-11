@@ -12,6 +12,13 @@ class PodcastEpisode
      */
     public static function compareDate($episode1, $episode2)
     {
+        if (
+            !$episode1 || !property_exists($episode1, 'date')
+            || !$episode2 || !property_exists($episode2, 'date')
+        ) {
+            return 0;
+        }
+
         if ($episode1->date < $episode2->date) {
             return -1;
         } elseif ($episode1->date == $episode2->date) {
@@ -28,9 +35,8 @@ class PodcastEpisode
         }
 
         $episode = new PodcastEpisode();
-        $meta = $page['meta'];
 
-        foreach ($meta as $key => $value) {
+        foreach ($page['meta'] as $key => $value) {
             $episode->$key = $value;
         }
 
@@ -49,12 +55,16 @@ class PodcastEpisode
     public static function getDescriptionFromContent($content)
     {
         $contentText = PodcastEpisode::processContent($content);
-        return str_replace('(excerpt)', ' ', $contentText);
+        return $contentText ? str_replace('(excerpt)', ' ', $contentText) : null;
     }
 
     public static function getExcerptFromContent($content)
     {
         $contentText = PodcastEpisode::processContent($content);
+
+        if (!$contentText) {
+            return null;
+        }
 
         if (strpos($contentText, '(excerpt)') !== false) {
             $contentText = explode('(excerpt)', $contentText)[0] . '...';
@@ -65,16 +75,25 @@ class PodcastEpisode
 
     public function getFormattedDate()
     {
-        return date('r', strtotime($this->date));
+        if (!property_exists($this, 'date')) {
+            return null;
+        }
+
+        $time = strtotime($this->date);
+        return $time ? date('r', $time) : null;
     }
 
     public static function processContent($content)
     {
-        return str_replace(
-            [PHP_EOL, '</p><p>', '<p>', '</p>'],
-            [' ', ' ', '', ''],
-            trim($content)
-        );
+        if (is_string($content)) {
+            return str_replace(
+                [PHP_EOL, '</p><p>', '<p>', '</p>'],
+                [' ', ' ', '', ''],
+                trim($content)
+            );
+        } else {
+            return null;
+        }
     }
 
     public static function validatePageData($page)
