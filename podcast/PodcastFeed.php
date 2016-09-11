@@ -9,15 +9,22 @@ class PodcastFeed
         }
 
         $feed = new PodcastFeed();
-        $meta = $page['meta'];
 
-        foreach ($meta as $key => $value) {
+        foreach ($page['meta'] as $key => $value) {
             $feed->$key = $value;
         }
 
-        $feed->url = $page['url'];
-        $feed->guidfile = FileHelper::getFilePath($feed->assetspath, $feed->guidfile, true, true);
-        $feed->image = FileHelper::getFilePath($feed->assetspath, $feed->image);
+        $feed->url = ArrayHelper::getValue('url', $page);
+
+        if (property_exists($feed, 'assetspath')) {
+            if (property_exists($feed, 'guidfile')) {
+                $feed->guidfile = FileHelper::getFilePath($feed->assetspath, $feed->guidfile, true, true);
+            }
+
+            if (property_exists($feed, 'image')) {
+                $feed->image = FileHelper::getFilePath($feed->assetspath, $feed->image);
+            }
+        }
 
         return $feed;
     }
