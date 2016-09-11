@@ -84,12 +84,18 @@ class PodcastPlugin extends AbstractPicoPlugin
      */
     public function onPageRendering(Twig_Environment &$twig, array &$twigVariables, &$templateName)
     {
-        $twigVariables['latestEpisode'] = reset($this->episodes);
-        $twigVariables['earliestEpisode'] = end($this->episodes);
-        $twigVariables['episode'] = ArrayHelper::getValue($this->currentPageId, $this->episodes);
         $twigVariables['episodes'] = $this->episodes;
-        $twigVariables['feed'] = ArrayHelper::getValue($this->currentPageId, $this->feeds);
         $twigVariables['feeds'] = $this->feeds;
+
+        if ($this->episodes) {
+            $twigVariables['latestEpisode'] = reset($this->episodes);
+            $twigVariables['earliestEpisode'] = end($this->episodes);
+            $twigVariables['episode'] = ArrayHelper::getValue($this->currentPageId, $this->episodes);
+        }
+
+        if ($this->feeds) {
+            $twigVariables['feed'] = ArrayHelper::getValue($this->currentPageId, $this->feeds);
+        }
     }
 
     protected function setEpisodeFeedValues($episodes, $feeds)

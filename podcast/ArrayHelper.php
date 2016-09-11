@@ -10,6 +10,10 @@ class ArrayHelper
 
     public static function getValue($key, $array)
     {
-        return array_key_exists($key, $array) ? $array[$key] : null;
+        if (is_array($array)) {
+            return array_key_exists($key, $array) ? $array[$key] : null;
+        } else {
+            return null;
+        }
     }
 }

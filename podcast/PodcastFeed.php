@@ -28,6 +28,10 @@ class PodcastFeed
             return false;
         }
 
+        if (!array_key_exists('id', $page)) {
+            return false;
+        }
+
         if (!array_key_exists('meta', $page)) {
             return false;
         }
