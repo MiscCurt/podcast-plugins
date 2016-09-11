@@ -147,13 +147,15 @@ class PodcastPlugin extends AbstractPicoPlugin
      */
     protected function sortEpisodes(&$episodes)
     {
-        // Use this class's comparison function to sort the array
-        uasort($episodes, 'PodcastEpisode::compareDate');
+        if ($episodes) {
+            // Use this class's comparison function to sort the array
+            uasort($episodes, 'PodcastEpisode::compareDate');
 
-        // Reverse the result in order to put the episodes in reverse
-        // chronological order. We could just make compareEpisodes reverse the
-        // order directly, but coding this way makes both functions easier to
-        // understand
-        $episodes = array_reverse($episodes, true);
+            // Reverse the result in order to put the episodes in reverse
+            // chronological order. We could just make compareEpisodes reverse the
+            // order directly, but coding this way makes both functions easier to
+            // understand
+            $episodes = array_reverse($episodes, true);
+        }
     }
 }
