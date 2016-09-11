@@ -7,20 +7,27 @@ class FileHelper
         $result = [];
         $handle = curl_init($path);
 
-        try {
-            curl_setopt($handle, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($handle, CURLOPT_HEADER, true);
-            curl_setopt($handle, CURLOPT_NOBODY, true);
-            curl_setopt($handle, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($handle, CURLOPT_USERAGENT, 'PodcastPlugin/0.1 (+https://github.com/MiscCurt/podcast-plugins)');
-            curl_exec($handle);
+        if ($handle) {
+            try {
+                $noOptionError = curl_setopt($handle, CURLOPT_FOLLOWLOCATION, true)
+                    && curl_setopt($handle, CURLOPT_HEADER, true)
+                    && curl_setopt($handle, CURLOPT_NOBODY, true)
+                    && curl_setopt($handle, CURLOPT_RETURNTRANSFER, true)
+                    && curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false)
+                    && curl_setopt($handle, CURLOPT_USERAGENT, 'PodcastPlugin/0.1 (+https://github.com/MiscCurt/podcast-plugins)');
 
-            foreach ($infoKeys as $key) {
-                $result[$key] = curl_getinfo($handle, $key);
+                if ($noOptionError) {
+                    $execResult = curl_exec($handle);
+
+                    if ($execResult !== false) {
+                        foreach ($infoKeys as $key) {
+                            $result[$key] = curl_getinfo($handle, $key);
+                        }
+                    }
+                }
+            } finally {
+                curl_close($handle);
             }
-        } finally {
-            curl_close($handle);
         }
 
         return $result;
@@ -28,6 +35,10 @@ class FileHelper
 
     public static function getFilePath($path, $fileName, $readable = true, $writable = false)
     {
+        if (!is_string($path)) {
+            return false;
+        }
+
         if (!is_string($fileName)) {
             return false;
         }
@@ -41,36 +52,49 @@ class FileHelper
         $filePath = $path . $fileName;
 
         if (
-            (is_readable($filePath) || !$readable)
-            && (is_writable($filePath) || !$writable)
+            (!$readable || is_readable($filePath))
+            && (!$writable || is_writable($filePath))
         ) {
             return $filePath;
         }
 
         if (
-            (is_readable($fileName) || !$readable)
-            && (is_writable($fileName) || !$writable)
+            (!$readable || is_readable($fileName))
+            && (!$writable || is_writable($fileName))
         ) {
             return $fileName;
         }
 
-        $handle = curl_init($filePath);
+        // $handle = curl_init($filePath);
+        //
+        // if ($handle) {
+        //     try {
+        //         $noOptionError = curl_setopt($handle, CURLOPT_FOLLOWLOCATION, true)
+        //             && curl_setopt($handle, CURLOPT_NOBODY, true)
+        //             && curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false)
+        //             && curl_setopt($handle, CURLOPT_USERAGENT, 'PodcastPlugin/0.1 (+https://github.com/MiscCurt/podcast-plugins)');
+        //
+        //         if ($noOptionError) {
+        //             $execResult = curl_exec($handle);
+        //
+        //             if ($execResult !== false) {
+        //                 $returnCode = curl_getinfo($handle, CURLINFO_HTTP_CODE);
+        //             }
+        //         }
+        //     } finally {
+        //         curl_close($handle);
+        //     }
+        //
+        //     $info = self::getCurlInfo($filePath, [CURLINFO_HTTP_CODE]);
+        //
+        //     if ($info[CURLINFO_HTTP_CODE] == 200 && !$writable) {
+        //         return $filePath;
+        //     }
+        // }
 
-        try {
-            curl_setopt($handle, CURLOPT_FOLLOWLOCATION, true);
-            curl_setopt($handle, CURLOPT_NOBODY, true);
-            curl_setopt($handle, CURLOPT_SSL_VERIFYPEER, false);
-            curl_setopt($handle, CURLOPT_USERAGENT, 'PodcastPlugin/0.1 (+https://github.com/MiscCurt/podcast-plugins)');
-            curl_exec($handle);
-            $returnCode = curl_getinfo($handle, CURLINFO_HTTP_CODE);
-        } finally {
-            curl_close($handle);
-        }
-
-        $info = self::getCurlInfo($filePath, [CURLINFO_HTTP_CODE]);
-
-        if ($info[CURLINFO_HTTP_CODE] == 200 && !$writable) {
-            return $filePath;
+        if (!$writable) {
+            $curlInfo = self::getCurlInfo($filePath, [CURLINFO_HTTP_CODE]);
+            return ArrayHelper::getValue(CURLINFO_HTTP_CODE, $curlInfo) == 200;
         }
 
         return false;
@@ -94,11 +118,8 @@ class FileHelper
         }
 
         $info = self::getCurlInfo($filePath, [CURLINFO_CONTENT_LENGTH_DOWNLOAD]);
+        $length = ArrayHelper::getValue(CURLINFO_CONTENT_LENGTH_DOWNLOAD, $info);
 
-        if (array_key_exists(CURLINFO_CONTENT_LENGTH_DOWNLOAD, $info)) {
-            return $info[CURLINFO_CONTENT_LENGTH_DOWNLOAD];
-        }
-
-        return false;
+        return $length ? $length : false;
     }
 }
