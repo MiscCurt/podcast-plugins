@@ -2,24 +2,49 @@
 
 class PodcastPlugin extends AbstractPicoPlugin
 {
+    protected $currentPageId = null;
     protected $episodes = null;
+    protected $feeds = null;
 
     /**
-     * Compares two episodes and determines their sort order based on date
+     * Triggered when Pico reads a single page from the list of all known pages
      *
-     * @param PodcastEpisode $episode1 The first episode
-     * @param PodcastEpisode $episode2 The second episode
+     * The `$pageData` parameter consists of the following values:
      *
-     * @return int -1, 0, or 1, for compatibility with PHP's usort function
+     * | Array key      | Type   | Description                              |
+     * | -------------- | ------ | ---------------------------------------- |
+     * | id             | string | relative path to the content file        |
+     * | url            | string | URL to the page                          |
+     * | title          | string | title of the page (YAML header)          |
+     * | description    | string | description of the page (YAML header)    |
+     * | author         | string | author of the page (YAML header)         |
+     * | time           | string | timestamp derived from the Date header   |
+     * | date           | string | date of the page (YAML header)           |
+     * | date_formatted | string | formatted date of the page               |
+     * | raw_content    | string | raw, not yet parsed contents of the page |
+     * | meta           | string | parsed meta data of the page             |
+     *
+     * @see    DummyPlugin::onPagesLoaded()
+     * @param  array &$pageData data of the loaded page
+     * @return void
      */
-    protected function compareEpisodes($episode1, $episode2)
+    public function onSinglePageLoaded(&$pageData)
     {
-        if ($episode1->date < $episode2->date) {
-            return -1;
-        } elseif ($episode1->date == $episode2->date) {
-            return 0;
-        } elseif ($episode1->date > $episode2->date) {
-            return 1;
+        // As each of the site's pages is loaded, create and save data objects
+        if (PodcastEpisode::validatePageData($pageData)) {
+            $episode = PodcastEpisode::createFromPage($pageData);
+
+            if ($episode) {
+                $this->episodes[$pageData['id']] = $episode;
+            }
+        }
+
+        if (PodcastFeed::validatePageData($pageData)) {
+            $feed = PodcastFeed::createFromPage($pageData);
+
+            if ($feed) {
+                $this->feeds[$pageData['id']] = $feed;
+            }
         }
     }
 
@@ -40,20 +65,21 @@ class PodcastPlugin extends AbstractPicoPlugin
      * @return void
      */
     public function onPagesLoaded(
-        array &$pages,
-        array &$currentPage = null,
-        array &$previousPage = null,
-        array &$nextPage = null
+        &$pages,
+        &$currentPage = null,
+        &$previousPage = null,
+        &$nextPage = null
     ) {
-        $this->episodes = [];
-
-        foreach ($pages as $page) {
-            $episode = PodcastEpisode::createFromPage($page);
-
-            if (!is_null($episode)) {
-                $this->episodes[] = $episode;
-            }
+        if (is_array($currentPage) && array_key_exists('id', $currentPage)) {
+            $this->currentPageId = $currentPage['id'];
         }
+
+        // While much of the processing to extract data from the pages is done
+        // in onSinglePageLoaded, some things can only be done once all the
+        // pages are loaded - particularly things that require information from
+        // more than one page type. Do those things here
+        $this->sortEpisodes($this->episodes);
+        $this->setEpisodeFeedValues($this->episodes, $this->feeds);
     }
 
     /**
@@ -66,10 +92,71 @@ class PodcastPlugin extends AbstractPicoPlugin
      * @param  string           &$templateName  file name of the template
      * @return void
      */
-    public function onPageRendering(Twig_Environment &$twig, array &$twigVariables, &$templateName)
+    public function onPageRendering(&$twig, &$twigVariables, &$templateName)
     {
-        $this->sortEpisodes($this->episodes);
         $twigVariables['episodes'] = $this->episodes;
+        $twigVariables['feeds'] = $this->feeds;
+
+        if ($this->episodes) {
+            $twigVariables['latestEpisode'] = reset($this->episodes);
+            $twigVariables['earliestEpisode'] = end($this->episodes);
+
+            if (property_exists($this, 'currentPageId')) {
+                $twigVariables['episode'] = ArrayHelper::getValue($this->currentPageId, $this->episodes);
+            }
+        }
+
+        if ($this->feeds && property_exists($this, 'currentPageId')) {
+            $twigVariables['feed'] = ArrayHelper::getValue($this->currentPageId, $this->feeds);
+        }
+    }
+
+    protected function setEpisodeFeedValues($episodes, $feeds)
+    {
+        if (!is_array($episodes) || !is_array($feeds)) {
+            return;
+        }
+
+        foreach ($episodes as $episode) {
+            if (
+                property_exists($episode, 'feed')
+                && array_key_exists($episode->feed, $feeds)
+            ) {
+                $feed = $feeds[$episode->feed];
+
+                if (property_exists($feed, 'assetspath')) {
+                    if (property_exists($episode, 'banner')) {
+                        $episode->banner = FileHelper::getFilePath(
+                            $feed->assetspath,
+                            $episode->banner
+                        );
+                    }
+
+                    if (property_exists($episode, 'thumbnail')) {
+                        $episode->thumbnail = FileHelper::getFilePath(
+                            $feed->assetspath,
+                            $episode->thumbnail
+                        );
+                    }
+
+                    if (property_exists($episode, 'sound')) {
+                        $episode->sound = FileHelper::getFilePath(
+                            $feed->assetspath,
+                            $episode->sound
+                        );
+
+                        $episode->size = FileHelper::getFileSize($episode->sound);
+                    }
+                }
+
+                // $guidFile = PodcastGuidFile::createFromFile($feed->guidfile);
+                //
+                // if ($guidFile) {
+                //     $episode->guid = $guidFile->getGuidForId($episode->id);
+                // }
+                $episode->guid = "test-guid";
+            }
+        }
     }
 
     /**
@@ -81,13 +168,15 @@ class PodcastPlugin extends AbstractPicoPlugin
      */
     protected function sortEpisodes(&$episodes)
     {
-        // Use this class's comparison function to sort the array
-        usort($episodes, array('PodcastPlugin', 'compareEpisodes'));
+        if ($episodes) {
+            // Use this class's comparison function to sort the array
+            uasort($episodes, 'PodcastEpisode::compareDate');
 
-        // Reverse the result in order to put the episodes in reverse
-        // chronological order. We could just make compareEpisodes reverse the
-        // order directly, but coding this way makes both functions easier to
-        // understand
-        $episodes = array_reverse($episodes);
+            // Reverse the result in order to put the episodes in reverse
+            // chronological order. We could just make compareEpisodes reverse the
+            // order directly, but coding this way makes both functions easier to
+            // understand
+            $episodes = array_reverse($episodes, true);
+        }
     }
 }

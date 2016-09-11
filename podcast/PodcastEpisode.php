@@ -2,67 +2,125 @@
 
 class PodcastEpisode
 {
-    public $title = '';
-    public $address = '';
-    public $date = null;
-    public $bannerImage = '';
-    public $thumbnailImage = '';
-    public $sound = '';
-    public $excerpt = '';
+    /**
+     * Compares two episodes and determines their sort order based on date
+     *
+     * @param PodcastEpisode $episode1 The first episode
+     * @param PodcastEpisode $episode2 The second episode
+     *
+     * @return int -1, 0, or 1, for compatibility with PHP's usort function
+     */
+    public static function compareDate($episode1, $episode2)
+    {
+        if (
+            !$episode1 || !property_exists($episode1, 'date')
+            || !$episode2 || !property_exists($episode2, 'date')
+        ) {
+            return 0;
+        }
+
+        if ($episode1->date < $episode2->date) {
+            return -1;
+        } elseif ($episode1->date == $episode2->date) {
+            return 0;
+        } elseif ($episode1->date > $episode2->date) {
+            return 1;
+        }
+    }
 
     public static function createFromPage($page)
     {
-        $episode = null;
-
-        if (PodcastEpisode::validatePageData($page)) {
-            $meta = $page['meta'];
-
-            $episode = new PodcastEpisode();
-            $episode->title = $meta['title'];
-
-            $episode->address = $page['url'];
-
-            if (array_key_exists('date', $meta)) {
-                $episode->date = strtotime($meta['date']);
-            }
-
-            if (array_key_exists('banner', $meta)) {
-                $episode->bannerImage = $meta['banner'];
-            }
-
-            if (array_key_exists('thumbnail', $meta)) {
-                $episode->thumbnailImage = $meta['thumbnail'];
-            }
-
-            if (array_key_exists('sound', $meta)) {
-                $episode->sound = $meta['sound'];
-            }
-
-            if (array_key_exists('content', $page)) {
-                if (strpos($page['content'], '(excerpt)') !== false) {
-                    $episode->excerpt = explode('(excerpt)', $page['content'])[0] . '...';
-                } else {
-                    $episode->excerpt = $page['content'];
-                }
-            }
+        if (!PodcastEpisode::validatePageData($page)) {
+            return null;
         }
+
+        $episode = new PodcastEpisode();
+
+        foreach ($page['meta'] as $key => $value) {
+            $episode->$key = $value;
+        }
+
+        $episode->id = $page['id'];
+        $episode->link = ArrayHelper::getValue('url', $page);
+        $episode->description = PodcastEpisode::getDescriptionFromContent(
+            ArrayHelper::getValue('content', $page)
+        );
+        $episode->excerpt = PodcastEpisode::getExcerptFromContent(
+            ArrayHelper::getValue('content', $page)
+        );
 
         return $episode;
     }
 
+    public static function getDescriptionFromContent($content)
+    {
+        $contentText = PodcastEpisode::processContent($content);
+        return $contentText ? str_replace('(excerpt)', ' ', $contentText) : null;
+    }
+
+    public static function getExcerptFromContent($content)
+    {
+        $contentText = PodcastEpisode::processContent($content);
+
+        if (!$contentText) {
+            return null;
+        }
+
+        if (strpos($contentText, '(excerpt)') !== false) {
+            $contentText = explode('(excerpt)', $contentText)[0] . '...';
+        }
+
+        return $contentText;
+    }
+
+    public function getFormattedDate()
+    {
+        if (!property_exists($this, 'date')) {
+            return null;
+        }
+
+        $time = strtotime($this->date);
+        return $time ? date('r', $time) : null;
+    }
+
+    public static function processContent($content)
+    {
+        if (is_string($content)) {
+            return str_replace(
+                [PHP_EOL, '</p><p>', '<p>', '</p>'],
+                [' ', ' ', '', ''],
+                trim($content)
+            );
+        } else {
+            return null;
+        }
+    }
+
     public static function validatePageData($page)
     {
+        if (!is_array($page)) {
+            return false;
+        }
+
+        if (!array_key_exists('id', $page)) {
+            return false;
+        }
+
         if (!array_key_exists('meta', $page)) {
             return false;
         }
 
         $meta = $page['meta'];
 
-        if (!array_key_exists('template', $meta)) {
+        if (!is_array($meta)) {
             return false;
         }
 
-        if ($meta['template'] != 'episode') {
+        if (!array_key_exists('contains', $meta)) {
+            return false;
+        }
+
+        if ($meta['contains'] != 'episode') {
             return false;
         }
 
