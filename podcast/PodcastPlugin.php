@@ -28,15 +28,23 @@ class PodcastPlugin extends AbstractPicoPlugin
      * @param  array &$pageData data of the loaded page
      * @return void
      */
-    public function onSinglePageLoaded(array &$pageData)
+    public function onSinglePageLoaded(&$pageData)
     {
         // As each of the site's pages is loaded, create and save data objects
         if (PodcastEpisode::validatePageData($pageData)) {
-            $this->episodes[$pageData['id']] = PodcastEpisode::createFromPage($pageData);
+            $episode = PodcastEpisode::createFromPage($pageData);
+
+            if ($episode) {
+                $this->episodes[$pageData['id']] = $episode;
+            }
         }
 
         if (PodcastFeed::validatePageData($pageData)) {
-            $this->feeds[$pageData['id']] = PodcastFeed::createFromPage($pageData);
+            $feed = PodcastFeed::createFromPage($pageData);
+
+            if ($feed) {
+                $this->feeds[$pageData['id']] = $feed;
+            }
         }
     }
 
@@ -57,12 +65,14 @@ class PodcastPlugin extends AbstractPicoPlugin
      * @return void
      */
     public function onPagesLoaded(
-        array &$pages,
-        array &$currentPage = null,
-        array &$previousPage = null,
-        array &$nextPage = null
+        &$pages,
+        &$currentPage = null,
+        &$previousPage = null,
+        &$nextPage = null
     ) {
-        $this->currentPageId = $currentPage['id'];
+        if (is_array($currentPage) && array_key_exists('id', $currentPage)) {
+            $this->currentPageId = $currentPage['id'];
+        }
 
         // While much of the processing to extract data from the pages is done
         // in onSinglePageLoaded, some things can only be done once all the
@@ -82,7 +92,7 @@ class PodcastPlugin extends AbstractPicoPlugin
      * @param  string           &$templateName  file name of the template
      * @return void
      */
-    public function onPageRendering(Twig_Environment &$twig, array &$twigVariables, &$templateName)
+    public function onPageRendering(&$twig, &$twigVariables, &$templateName)
     {
         $twigVariables['episodes'] = $this->episodes;
         $twigVariables['feeds'] = $this->feeds;
@@ -90,10 +100,13 @@ class PodcastPlugin extends AbstractPicoPlugin
         if ($this->episodes) {
             $twigVariables['latestEpisode'] = reset($this->episodes);
             $twigVariables['earliestEpisode'] = end($this->episodes);
-            $twigVariables['episode'] = ArrayHelper::getValue($this->currentPageId, $this->episodes);
+
+            if (property_exists($this, 'currentPageId')) {
+                $twigVariables['episode'] = ArrayHelper::getValue($this->currentPageId, $this->episodes);
+            }
         }
 
-        if ($this->feeds) {
+        if ($this->feeds && property_exists($this, 'currentPageId')) {
             $twigVariables['feed'] = ArrayHelper::getValue($this->currentPageId, $this->feeds);
         }
     }
@@ -111,27 +124,29 @@ class PodcastPlugin extends AbstractPicoPlugin
             ) {
                 $feed = $feeds[$episode->feed];
 
-                if (property_exists($episode, 'banner')) {
-                    $episode->banner = FileHelper::getFilePath(
-                        $feed->assetspath,
-                        $episode->banner
-                    );
-                }
+                if (property_exists($feed, 'assetspath')) {
+                    if (property_exists($episode, 'banner')) {
+                        $episode->banner = FileHelper::getFilePath(
+                            $feed->assetspath,
+                            $episode->banner
+                        );
+                    }
 
-                if (property_exists($episode, 'thumbnail')) {
-                    $episode->thumbnail = FileHelper::getFilePath(
-                        $feed->assetspath,
-                        $episode->thumbnail
-                    );
-                }
+                    if (property_exists($episode, 'thumbnail')) {
+                        $episode->thumbnail = FileHelper::getFilePath(
+                            $feed->assetspath,
+                            $episode->thumbnail
+                        );
+                    }
 
-                if (property_exists($episode, 'sound')) {
-                    $episode->sound = FileHelper::getFilePath(
-                        $feed->assetspath,
-                        $episode->sound
-                    );
+                    if (property_exists($episode, 'sound')) {
+                        $episode->sound = FileHelper::getFilePath(
+                            $feed->assetspath,
+                            $episode->sound
+                        );
 
-                    $episode->size = FileHelper::getFileSize($episode->sound);
+                        $episode->size = FileHelper::getFileSize($episode->sound);
+                    }
                 }
 
                 // $guidFile = PodcastGuidFile::createFromFile($feed->guidfile);
